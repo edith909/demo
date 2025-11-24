@@ -1,0 +1,95 @@
+-- =======================================
+-- CONNECT TO DATABASE
+-- =======================================
+CREATE DATABASE securityDB;
+USE securityDB;
+
+-- =======================================
+-- CREATE SAMPLE USER ACCOUNTS
+-- (used for DCL operations)
+-- =======================================
+CREATE USER 'user1'@'localhost' IDENTIFIED BY 'password123';
+CREATE USER 'admin1'@'localhost' IDENTIFIED BY 'admin123';
+CREATE USER 'report_user'@'localhost' IDENTIFIED BY 'report123';
+
+-- =======================================
+-- GRANT PRIVILEGES
+-- =======================================
+
+-- Grant all privileges on a database
+GRANT ALL PRIVILEGES ON securityDB.* TO 'admin1'@'localhost';
+
+-- Grant SELECT only
+GRANT SELECT ON securityDB.* TO 'user1'@'localhost';
+
+-- Grant INSERT, UPDATE
+GRANT INSERT, UPDATE ON securityDB.* TO 'user1'@'localhost';
+
+-- Grant only SELECT on specific table
+GRANT SELECT ON securityDB.reports TO 'report_user'@'localhost';
+
+-- Grant privilege with GRANT OPTION (user can grant others)
+GRANT ALL PRIVILEGES ON securityDB.* TO 'admin1'@'localhost' WITH GRANT OPTION;
+
+-- =======================================
+-- REVOKE PRIVILEGES
+-- =======================================
+
+-- Revoke specific privilege
+REVOKE INSERT ON securityDB.* FROM 'user1'@'localhost';
+
+-- Revoke all privileges
+REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'admin1'@'localhost';
+
+-- =======================================
+-- ROLE MANAGEMENT (MySQL 8.0+)
+-- =======================================
+
+-- Create roles
+CREATE ROLE read_only;
+CREATE ROLE data_editor;
+CREATE ROLE manager_role;
+
+-- Grant privileges to roles
+GRANT SELECT ON securityDB.* TO read_only;
+GRANT INSERT, UPDATE, DELETE ON securityDB.* TO data_editor;
+GRANT ALL PRIVILEGES ON securityDB.* TO manager_role;
+
+-- Assign roles to users
+GRANT read_only TO 'report_user'@'localhost';
+GRANT data_editor TO 'user1'@'localhost';
+GRANT manager_role TO 'admin1'@'localhost';
+
+-- Set default role for user
+SET DEFAULT ROLE read_only TO 'report_user'@'localhost';
+
+-- Activate a role for current session
+SET ROLE read_only;
+
+-- =======================================
+-- SHOW PRIVILEGES & ROLES
+-- =======================================
+
+SHOW GRANTS FOR 'user1'@'localhost';
+SHOW GRANTS FOR 'admin1'@'localhost';
+SHOW GRANTS FOR 'report_user'@'localhost';
+
+SHOW GRANTS FOR ROLE read_only;
+SHOW GRANTS FOR ROLE data_editor;
+SHOW GRANTS FOR ROLE manager_role;
+
+-- =======================================
+-- DROP USERS & ROLES (optional clean up)
+-- =======================================
+
+DROP USER 'user1'@'localhost';
+DROP USER 'admin1'@'localhost';
+DROP USER 'report_user'@'localhost';
+
+DROP ROLE read_only;
+DROP ROLE data_editor;
+DROP ROLE manager_role;
+
+-- =======================================
+-- END OF DCL SCRIPT
+-- =======================================
