@@ -1,148 +1,219 @@
 -- ============================================
--- EXPERIMENT 9:
--- PL/SQL Programs demonstrating all types of Cursors
+-- EXPERIMENT 8:
+-- PL/SQL programs demonstrating all types of Triggers
 -- ============================================
 
 SET SERVEROUTPUT ON;
 
 -- ============================================
--- CREATE SAMPLE TABLE
+-- 1. CREATE SAMPLE TABLES
 -- ============================================
 
-CREATE TABLE EMP (
+-- Main employee table
+CREATE TABLE EMP_TRG (
     EMP_ID      NUMBER PRIMARY KEY,
     EMP_NAME    VARCHAR2(50),
-    DEPT        VARCHAR2(50),
+    DEPT        VARCHAR2(30),
     SALARY      NUMBER(10,2)
 );
 
--- INSERT SAMPLE DATA
-INSERT INTO EMP VALUES (101, 'Rohan',  'IT',        45000);
-INSERT INTO EMP VALUES (102, 'Sneha',  'HR',        35000);
-INSERT INTO EMP VALUES (103, 'Amit',   'IT',        50000);
-INSERT INTO EMP VALUES (104, 'Priya',  'Finance',   38000);
-INSERT INTO EMP VALUES (105, 'Kiran',  'HR',        42000);
+-- Log table for auditing
+CREATE TABLE EMP_LOG (
+    LOG_ID      NUMBER PRIMARY KEY,
+    ACTION      VARCHAR2(20),
+    EMP_ID      NUMBER,
+    OLD_SAL     NUMBER(10,2),
+    NEW_SAL     NUMBER(10,2),
+    ACTION_DATE DATE
+);
+
+-- Sequence for log table
+CREATE SEQUENCE EMP_LOG_SEQ
+START WITH 1
+INCREMENT BY 1;
+
+-- Insert some initial data
+INSERT INTO EMP_TRG VALUES (101, 'Rohan', 'IT',       40000);
+INSERT INTO EMP_TRG VALUES (102, 'Sneha', 'HR',       35000);
+INSERT INTO EMP_TRG VALUES (103, 'Amit',  'Finance',  45000);
+COMMIT;
+
+-- ============================================
+-- 2. BEFORE INSERT ROW-LEVEL TRIGGER
+--    (fires for each row before insert)
+-- ============================================
+
+CREATE OR REPLACE TRIGGER BI_EMP_TRG
+BEFORE INSERT ON EMP_TRG
+FOR EACH ROW
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('BEFORE INSERT Trigger: New Employee ' || :NEW.EMP_NAME);
+    
+    -- Example: if salary not given, set default
+    IF :NEW.SALARY IS NULL THEN
+        :NEW.SALARY := 30000;
+    END IF;
+END;
+/
+
+-- Test BEFORE INSERT trigger
+INSERT INTO EMP_TRG (EMP_ID, EMP_NAME, DEPT, SALARY)
+VALUES (104, 'Priya', 'IT', NULL);
 
 COMMIT;
 
 -- ============================================
--- 1. IMPLICIT CURSOR 
--- (used automatically for INSERT/UPDATE/DELETE)
+-- 3. AFTER INSERT STATEMENT-LEVEL TRIGGER
+--    (fires once after entire insert statement)
 -- ============================================
 
+CREATE OR REPLACE TRIGGER AI_EMP_TRG
+AFTER INSERT ON EMP_TRG
 BEGIN
-    UPDATE EMP
-    SET SALARY = SALARY + 1000
-    WHERE DEPT = 'IT';
-
-    DBMS_OUTPUT.PUT_LINE('Rows Updated = ' || SQL%ROWCOUNT);
+    DBMS_OUTPUT.PUT_LINE('AFTER INSERT Trigger: Insert operation done on EMP_TRG table');
 END;
 /
--- SQL%ROWCOUNT, SQL%FOUND, SQL%NOTFOUND, SQL%ISOPEN
 
+-- Test AFTER INSERT trigger (statement level)
+INSERT INTO EMP_TRG VALUES (105, 'Kiran', 'HR', 38000);
+COMMIT;
 
 -- ============================================
--- 2. EXPLICIT CURSOR
+-- 4. BEFORE UPDATE ROW-LEVEL TRIGGER
+--    (demonstrate :OLD and :NEW)
 -- ============================================
 
+CREATE OR REPLACE TRIGGER BU_EMP_TRG
+BEFORE UPDATE OF SALARY ON EMP_TRG
+FOR EACH ROW
+BEGIN
+    DBMS_OUTPUT.PUT_LINE(
+        'BEFORE UPDATE Trigger: EmpID ' || :OLD.EMP_ID ||
+        ' Salary changing from ' || :OLD.SALARY ||
+        ' to ' || :NEW.SALARY
+    );
+
+    -- Example: Do not allow salary decrease
+    IF :NEW.SALARY < :OLD.SALARY THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Salary cannot be decreased!');
+    END IF;
+END;
+/
+
+-- Test BEFORE UPDATE trigger (valid – increase)
+UPDATE EMP_TRG
+SET SALARY = SALARY + 2000
+WHERE EMP_ID = 101;
+
+COMMIT;
+
+-- Test BEFORE UPDATE trigger (invalid – decrease)
+-- This will raise an error
+BEGIN
+    UPDATE EMP_TRG
+    SET SALARY = 10000
+    WHERE EMP_ID = 102;
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error: ' || SQLERRM);
+END;
+/
+
+-- ============================================
+-- 5. AFTER DELETE ROW-LEVEL TRIGGER
+-- ============================================
+
+CREATE OR REPLACE TRIGGER AD_EMP_TRG
+AFTER DELETE ON EMP_TRG
+FOR EACH ROW
+BEGIN
+    DBMS_OUTPUT.PUT_LINE(
+        'AFTER DELETE Trigger: Employee deleted: ' ||
+        :OLD.EMP_ID || ' - ' || :OLD.EMP_NAME
+    );
+END;
+/
+
+-- Test AFTER DELETE trigger
+DELETE FROM EMP_TRG
+WHERE EMP_ID = 105;
+COMMIT;
+
+-- ============================================
+-- 6. AUDIT TRIGGER: INSERT / UPDATE / DELETE
+--    (Row-level trigger with CASE logic)
+-- ============================================
+
+CREATE OR REPLACE TRIGGER AUDIT_EMP_TRG
+AFTER INSERT OR UPDATE OR DELETE ON EMP_TRG
+FOR EACH ROW
 DECLARE
-    CURSOR emp_cur IS
-        SELECT EMP_ID, EMP_NAME, SALARY FROM EMP;
-
-    v_id     EMP.EMP_ID%TYPE;
-    v_name   EMP.EMP_NAME%TYPE;
-    v_sal    EMP.SALARY%TYPE;
+    v_action VARCHAR2(20);
 BEGIN
-    OPEN emp_cur;
+    IF INSERTING THEN
+        v_action := 'INSERT';
+        INSERT INTO EMP_LOG (LOG_ID, ACTION, EMP_ID, OLD_SAL, NEW_SAL, ACTION_DATE)
+        VALUES (EMP_LOG_SEQ.NEXTVAL, v_action, :NEW.EMP_ID, NULL, :NEW.SALARY, SYSDATE);
 
-    LOOP
-        FETCH emp_cur INTO v_id, v_name, v_sal;
-        EXIT WHEN emp_cur%NOTFOUND;
+    ELSIF UPDATING THEN
+        v_action := 'UPDATE';
+        INSERT INTO EMP_LOG (LOG_ID, ACTION, EMP_ID, OLD_SAL, NEW_SAL, ACTION_DATE)
+        VALUES (EMP_LOG_SEQ.NEXTVAL, v_action, :OLD.EMP_ID, :OLD.SALARY, :NEW.SALARY, SYSDATE);
 
-        DBMS_OUTPUT.PUT_LINE(
-            'ID: ' || v_id || '  Name: ' || v_name ||
-            '  Salary: ' || v_sal
-        );
-    END LOOP;
-
-    CLOSE emp_cur;
-END;
-/
--- This shows manual OPEN, FETCH, CLOSE
-
-
--- ============================================
--- 3. CURSOR FOR LOOP
--- (NO FETCH, NO OPEN, NO CLOSE)
--- ============================================
-
-DECLARE
-    CURSOR c1 IS
-        SELECT EMP_NAME, DEPT FROM EMP;
-BEGIN
-    FOR rec IN c1 LOOP
-        DBMS_OUTPUT.PUT_LINE(
-            'Employee: ' || rec.EMP_NAME ||
-            ' | Dept: ' || rec.DEPT
-        );
-    END LOOP;
-END;
-/
--- Cursor FOR loop automatically opens/closes cursor
-
-
--- ============================================
--- 4. CURSOR WITH PARAMETERS
--- ============================================
-
-DECLARE
-    CURSOR dept_cur(p_dept VARCHAR2) IS
-        SELECT EMP_NAME, SALARY
-        FROM EMP
-        WHERE DEPT = p_dept;
-
-BEGIN
-    DBMS_OUTPUT.PUT_LINE('--- HR Department Employees ---');
-    FOR rec IN dept_cur('HR') LOOP
-        DBMS_OUTPUT.PUT_LINE(rec.EMP_NAME || ' earns ' || rec.SALARY);
-    END LOOP;
-
-    DBMS_OUTPUT.PUT_LINE('--- IT Department Employees ---');
-    FOR rec IN dept_cur('IT') LOOP
-        DBMS_OUTPUT.PUT_LINE(rec.EMP_NAME || ' earns ' || rec.SALARY);
-    END LOOP;
-END;
-/
--- Cursor with runtime parameters
-
-
--- ============================================
--- 5. CURSOR FOR UPDATE with WHERE CURRENT OF
--- (Used to update row currently fetched by cursor)
--- ============================================
-
-DECLARE
-    CURSOR c_sal IS
-        SELECT EMP_ID, SALARY
-        FROM EMP
-        FOR UPDATE;   -- locks rows for update
-
-BEGIN
-    FOR emp_rec IN c_sal LOOP
-        UPDATE EMP
-        SET SALARY = emp_rec.SALARY + 500   -- increment
-        WHERE CURRENT OF c_sal;              -- update exact row
-
-        DBMS_OUTPUT.PUT_LINE(
-            'Updated Employee ID ' || emp_rec.EMP_ID
-        );
-    END LOOP;
+    ELSIF DELETING THEN
+        v_action := 'DELETE';
+        INSERT INTO EMP_LOG (LOG_ID, ACTION, EMP_ID, OLD_SAL, NEW_SAL, ACTION_DATE)
+        VALUES (EMP_LOG_SEQ.NEXTVAL, v_action, :OLD.EMP_ID, :OLD.SALARY, NULL, SYSDATE);
+    END IF;
 END;
 /
 
--- Check updated values
-SELECT * FROM EMP;
+-- Test Audit Trigger
+INSERT INTO EMP_TRG VALUES (106, 'Meena', 'IT', 42000);
+UPDATE EMP_TRG SET SALARY = 45000 WHERE EMP_ID = 106;
+DELETE FROM EMP_TRG WHERE EMP_ID = 106;
+COMMIT;
+
+-- See log entries
+SELECT * FROM EMP_LOG;
 
 -- ============================================
--- END OF CURSOR EXPERIMENT
+-- 7. INSTEAD OF TRIGGER (on VIEW)
+--    Used when view is not directly updatable
+-- ============================================
+
+-- Base table
+CREATE TABLE EMP_BONUS (
+    EMP_ID    NUMBER PRIMARY KEY,
+    EMP_NAME  VARCHAR2(50),
+    BONUS     NUMBER(10,2)
+);
+
+INSERT INTO EMP_BONUS VALUES (201, 'Rohan',  5000);
+INSERT INTO EMP_BONUS VALUES (202, 'Sneha',  6000);
+COMMIT;
+
+-- Create view
+CREATE OR REPLACE VIEW EMP_BONUS_VIEW AS
+SELECT EMP_ID, EMP_NAME, BONUS
+FROM EMP_BONUS;
+
+-- INSTEAD OF trigger to handle insert into view
+CREATE OR REPLACE TRIGGER I_EMP_BONUS_V
+INSTEAD OF INSERT ON EMP_BONUS_VIEW
+FOR EACH ROW
+BEGIN
+    INSERT INTO EMP_BONUS (EMP_ID, EMP_NAME, BONUS)
+    VALUES (:NEW.EMP_ID, :NEW.EMP_NAME, :NEW.BONUS);
+END;
+/
+
+-- Test INSTEAD OF trigger
+INSERT INTO EMP_BONUS_VIEW (EMP_ID, EMP_NAME, BONUS)
+VALUES (203, 'Amit', 7000);
+
+SELECT * FROM EMP_BONUS;
+
+-- ============================================
+-- END OF TRIGGER EXPERIMENT
 -- ============================================
