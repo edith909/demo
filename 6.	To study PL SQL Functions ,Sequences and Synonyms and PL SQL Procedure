@@ -1,89 +1,169 @@
-Function: A PL/SQL block that returns a single value.
+-- ============================================
+-- EXPERIMENT 6:
+-- PL/SQL Functions, Sequences, Synonyms and Procedures
+-- ============================================
 
-Procedure: A PL/SQL block that performs an operation and may return values using OUT parameters.
+-- Enable output (for SQL*Plus / SQL Developer)
+SET SERVEROUTPUT ON;
 
-Sequence: Generates auto-increment values.
+-- ============================================
+-- 1. CREATE SAMPLE TABLE
+-- ============================================
 
-Synonym: Provides an alternate name for database objects.
-
-✅ Table Creation
-CREATE TABLE employee(
-    emp_id NUMBER PRIMARY KEY,
-    emp_name VARCHAR2(30),
-    salary NUMBER
+CREATE TABLE EMPLOYEE (
+    EMP_ID      NUMBER PRIMARY KEY,
+    EMP_NAME    VARCHAR2(50),
+    DEPT_NAME   VARCHAR2(50),
+    SALARY      NUMBER(10,2)
 );
 
-✅ Create Sequence
-CREATE SEQUENCE emp_seq
-START WITH 1
-INCREMENT BY 1;
+-- ============================================
+-- 2. CREATE SEQUENCE
+-- ============================================
 
-✅ Insert Data Using Sequence
-INSERT INTO employee VALUES(emp_seq.NEXTVAL, 'Rohit', 50000);
-INSERT INTO employee VALUES(emp_seq.NEXTVAL, 'Priya', 60000);
-INSERT INTO employee VALUES(emp_seq.NEXTVAL, 'Amit', 45000);
+CREATE SEQUENCE EMP_SEQ
+    START WITH 1
+    INCREMENT BY 1
+    NOCACHE;
 
-✅ Create Function (to return employee salary)
-CREATE OR REPLACE FUNCTION getSalary(eid NUMBER)
+-- ============================================
+-- 3. INSERT SAMPLE DATA USING SEQUENCE
+-- ============================================
+
+INSERT INTO EMPLOYEE (EMP_ID, EMP_NAME, DEPT_NAME, SALARY)
+VALUES (EMP_SEQ.NEXTVAL, 'Rohan', 'IT', 30000);
+
+INSERT INTO EMPLOYEE (EMP_ID, EMP_NAME, DEPT_NAME, SALARY)
+VALUES (EMP_SEQ.NEXTVAL, 'Sneha', 'HR', 35000);
+
+INSERT INTO EMPLOYEE (EMP_ID, EMP_NAME, DEPT_NAME, SALARY)
+VALUES (EMP_SEQ.NEXTVAL, 'Amit', 'Accounts', 28000);
+
+INSERT INTO EMPLOYEE (EMP_ID, EMP_NAME, DEPT_NAME, SALARY)
+VALUES (EMP_SEQ.NEXTVAL, 'Priya', 'IT', 40000);
+
+COMMIT;
+
+-- ============================================
+-- 4. CREATE SYNONYM FOR EMPLOYEE TABLE
+-- ============================================
+
+CREATE SYNONYM EMP_SYN FOR EMPLOYEE;
+
+-- Now we can use: SELECT * FROM EMP_SYN;
+
+-- ============================================
+-- 5. CREATE PL/SQL FUNCTION
+--    Example: Function to calculate annual salary
+-- ============================================
+
+CREATE OR REPLACE FUNCTION FN_ANNUAL_SALARY (
+    P_EMP_ID IN NUMBER
+)
 RETURN NUMBER
 IS
-    sal NUMBER;
+    V_SALARY   EMPLOYEE.SALARY%TYPE;
+    V_ANNUAL   NUMBER;
 BEGIN
-    SELECT salary INTO sal
-    FROM employee
-    WHERE emp_id = eid;
+    SELECT SALARY INTO V_SALARY
+    FROM EMPLOYEE
+    WHERE EMP_ID = P_EMP_ID;
 
-    RETURN sal;
+    V_ANNUAL := V_SALARY * 12;
+
+    RETURN V_ANNUAL;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN 0;
 END;
 /
 
-Execute Function
-SELECT getSalary(1) FROM dual;
+-- Test the function using SELECT
+SELECT EMP_ID,
+       EMP_NAME,
+       SALARY,
+       FN_ANNUAL_SALARY(EMP_ID) AS ANNUAL_SALARY
+FROM EMPLOYEE;
 
-✅ Create Procedure (to display employee info)
-CREATE OR REPLACE PROCEDURE showEmployee(eid NUMBER)
+-- ============================================
+-- 6. CREATE PL/SQL PROCEDURE
+--    Example: Procedure to give increment in salary
+-- ============================================
+
+CREATE OR REPLACE PROCEDURE PR_GIVE_INCREMENT (
+    P_EMP_ID   IN NUMBER,
+    P_PERCENT  IN NUMBER
+)
 IS
-    name employee.emp_name%TYPE;
-    sal employee.salary%TYPE;
 BEGIN
-    SELECT emp_name, salary INTO name, sal
-    FROM employee
-    WHERE emp_id = eid;
+    UPDATE EMPLOYEE
+    SET SALARY = SALARY + (SALARY * P_PERCENT / 100)
+    WHERE EMP_ID = P_EMP_ID;
 
-    DBMS_OUTPUT.PUT_LINE('Employee Name: ' || name);
-    DBMS_OUTPUT.PUT_LINE('Employee Salary: ' || sal);
+    DBMS_OUTPUT.PUT_LINE('Increment given to EMP_ID = ' || P_EMP_ID ||
+                         ' by ' || P_PERCENT || '%');
+
+    COMMIT;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        DBMS_OUTPUT.PUT_LINE('Employee not found.');
 END;
 /
 
-Execute Procedure
-SET SERVEROUTPUT ON;
+-- ============================================
+-- 7. CALL PROCEDURE FROM ANONYMOUS BLOCK
+-- ============================================
+
 BEGIN
-    showEmployee(2);
+    -- Give 10% increment to employee with EMP_ID = 1
+    PR_GIVE_INCREMENT(1, 10);
+
+    -- Give 5% increment to employee with EMP_ID = 2
+    PR_GIVE_INCREMENT(2, 5);
 END;
 /
 
-✅ Create Synonym
-CREATE SYNONYM emp FOR employee;
+-- Check updated salaries
+SELECT * FROM EMPLOYEE;
 
-Use Synonym
-SELECT * FROM emp;
+-- ============================================
+-- 8. ANOTHER FUNCTION EXAMPLE:
+--    FUNCTION TO RETURN BONUS AMOUNT (10% OF SALARY)
+-- ============================================
 
-✅ Output
-Table Data
-EMP_ID	EMP_NAME	SALARY
-1	Rohit	50000
-2	Priya	60000
-3	Amit	45000
-Function Output
-GETSALARY(1)
-------------
-50000
+CREATE OR REPLACE FUNCTION FN_CALC_BONUS (
+    P_EMP_ID IN NUMBER
+)
+RETURN NUMBER
+IS
+    V_SALARY EMPLOYEE.SALARY%TYPE;
+    V_BONUS  NUMBER;
+BEGIN
+    SELECT SALARY INTO V_SALARY
+    FROM EMPLOYEE
+    WHERE EMP_ID = P_EMP_ID;
 
-Procedure Output
-Employee Name: Priya
-Employee Salary: 60000
+    V_BONUS := V_SALARY * 0.10;  -- 10% bonus
+    RETURN V_BONUS;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN 0;
+END;
+/
 
-Synonym Output
-1  Rohit  50000
-2  Priya  60000
-3  Amit   45000
+-- Use bonus function in SELECT
+SELECT EMP_ID,
+       EMP_NAME,
+       SALARY,
+       FN_CALC_BONUS(EMP_ID) AS BONUS
+FROM EMPLOYEE;
+
+-- ============================================
+-- 9. USING SYNONYM IN QUERIES
+-- ============================================
+
+SELECT * FROM EMP_SYN;
+
+-- ============================================
+-- END OF EXPERIMENT 6 SCRIPT
+-- ============================================
