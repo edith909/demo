@@ -7,6 +7,8 @@ Enviroment Variable ->
 JAVA_HOME = C:\Program Files\Java\jdk1.8.0_202\
 JRE_HOME  = C:\Program Files\Java\jre1.8.0_202\bin ✅ (correct)
 
+set path for casendra 
+
 PowerShell -> Set-ExecutionPolicy Unrestricted -Scope CurrentUser
 
 cassandra -f
