@@ -1,113 +1,148 @@
-✅ 1. Implicit Cursor Example
+-- ============================================
+-- EXPERIMENT 9:
+-- PL/SQL Programs demonstrating all types of Cursors
+-- ============================================
 
-Oracle automatically creates an implicit cursor for INSERT / UPDATE / DELETE / SELECT INTO
+SET SERVEROUTPUT ON;
 
-Program
+-- ============================================
+-- CREATE SAMPLE TABLE
+-- ============================================
+
+CREATE TABLE EMP (
+    EMP_ID      NUMBER PRIMARY KEY,
+    EMP_NAME    VARCHAR2(50),
+    DEPT        VARCHAR2(50),
+    SALARY      NUMBER(10,2)
+);
+
+-- INSERT SAMPLE DATA
+INSERT INTO EMP VALUES (101, 'Rohan',  'IT',        45000);
+INSERT INTO EMP VALUES (102, 'Sneha',  'HR',        35000);
+INSERT INTO EMP VALUES (103, 'Amit',   'IT',        50000);
+INSERT INTO EMP VALUES (104, 'Priya',  'Finance',   38000);
+INSERT INTO EMP VALUES (105, 'Kiran',  'HR',        42000);
+
+COMMIT;
+
+-- ============================================
+-- 1. IMPLICIT CURSOR 
+-- (used automatically for INSERT/UPDATE/DELETE)
+-- ============================================
+
+BEGIN
+    UPDATE EMP
+    SET SALARY = SALARY + 1000
+    WHERE DEPT = 'IT';
+
+    DBMS_OUTPUT.PUT_LINE('Rows Updated = ' || SQL%ROWCOUNT);
+END;
+/
+-- SQL%ROWCOUNT, SQL%FOUND, SQL%NOTFOUND, SQL%ISOPEN
+
+
+-- ============================================
+-- 2. EXPLICIT CURSOR
+-- ============================================
+
 DECLARE
-  v_empid number := 101;
-  v_name varchar2(50);
-BEGIN
-  SELECT first_name INTO v_name 
-  FROM employees 
-  WHERE employee_id = v_empid;
+    CURSOR emp_cur IS
+        SELECT EMP_ID, EMP_NAME, SALARY FROM EMP;
 
-  DBMS_OUTPUT.PUT_LINE('Employee Name: ' || v_name);
+    v_id     EMP.EMP_ID%TYPE;
+    v_name   EMP.EMP_NAME%TYPE;
+    v_sal    EMP.SALARY%TYPE;
+BEGIN
+    OPEN emp_cur;
+
+    LOOP
+        FETCH emp_cur INTO v_id, v_name, v_sal;
+        EXIT WHEN emp_cur%NOTFOUND;
+
+        DBMS_OUTPUT.PUT_LINE(
+            'ID: ' || v_id || '  Name: ' || v_name ||
+            '  Salary: ' || v_sal
+        );
+    END LOOP;
+
+    CLOSE emp_cur;
 END;
 /
+-- This shows manual OPEN, FETCH, CLOSE
 
-Output
-Employee Name: Neena
 
-✅ 2. Explicit Cursor Example
+-- ============================================
+-- 3. CURSOR FOR LOOP
+-- (NO FETCH, NO OPEN, NO CLOSE)
+-- ============================================
 
-Manually declared cursor to fetch multiple rows.
-
-Program
 DECLARE
-  CURSOR c_emp IS SELECT employee_id, first_name FROM employees WHERE department_id = 60;
-  v_id employees.employee_id%TYPE;
-  v_name employees.first_name%TYPE;
+    CURSOR c1 IS
+        SELECT EMP_NAME, DEPT FROM EMP;
 BEGIN
-  OPEN c_emp;
-  LOOP
-    FETCH c_emp INTO v_id, v_name;
-    EXIT WHEN c_emp%NOTFOUND;
-    DBMS_OUTPUT.PUT_LINE('ID: '||v_id||' Name: '||v_name);
-  END LOOP;
-  CLOSE c_emp;
+    FOR rec IN c1 LOOP
+        DBMS_OUTPUT.PUT_LINE(
+            'Employee: ' || rec.EMP_NAME ||
+            ' | Dept: ' || rec.DEPT
+        );
+    END LOOP;
 END;
 /
+-- Cursor FOR loop automatically opens/closes cursor
 
-Output
-ID: 103 Name: Alexander
-ID: 104 Name: Bruce
-ID: 105 Name: David
 
-✅ 3. Cursor With Parameters
+-- ============================================
+-- 4. CURSOR WITH PARAMETERS
+-- ============================================
 
-Cursor accepts arguments.
-
-Program
 DECLARE
-  CURSOR c_dept(p_dept_id NUMBER) 
-  IS SELECT first_name FROM employees WHERE department_id = p_dept_id;
+    CURSOR dept_cur(p_dept VARCHAR2) IS
+        SELECT EMP_NAME, SALARY
+        FROM EMP
+        WHERE DEPT = p_dept;
 
-  v_name employees.first_name%TYPE;
 BEGIN
-  OPEN c_dept(60);
-  LOOP
-    FETCH c_dept INTO v_name;
-    EXIT WHEN c_dept%NOTFOUND;
-    DBMS_OUTPUT.PUT_LINE('Employee: ' || v_name);
-  END LOOP;
-  CLOSE c_dept;
+    DBMS_OUTPUT.PUT_LINE('--- HR Department Employees ---');
+    FOR rec IN dept_cur('HR') LOOP
+        DBMS_OUTPUT.PUT_LINE(rec.EMP_NAME || ' earns ' || rec.SALARY);
+    END LOOP;
+
+    DBMS_OUTPUT.PUT_LINE('--- IT Department Employees ---');
+    FOR rec IN dept_cur('IT') LOOP
+        DBMS_OUTPUT.PUT_LINE(rec.EMP_NAME || ' earns ' || rec.SALARY);
+    END LOOP;
 END;
 /
+-- Cursor with runtime parameters
 
-Output
-Employee: Alexander
-Employee: Bruce
-Employee: David
 
-✅ 4. Cursor FOR Loop
+-- ============================================
+-- 5. CURSOR FOR UPDATE with WHERE CURRENT OF
+-- (Used to update row currently fetched by cursor)
+-- ============================================
 
-Simplest way — Oracle handles open/fetch/close automatically
-
-Program
-BEGIN
-  FOR emp_rec IN (SELECT employee_id, first_name FROM employees WHERE department_id=60)
-  LOOP
-    DBMS_OUTPUT.PUT_LINE('ID: '||emp_rec.employee_id||' Name: '||emp_rec.first_name);
-  END LOOP;
-END;
-/
-
-Output
-ID: 103 Name: Alexander
-ID: 104 Name: Bruce
-ID: 105 Name: David
-
-✅ 5. Cursor With UPDATE
-
-Updating rows using cursor FOR UPDATE
-
-Program
 DECLARE
-  CURSOR c_sal IS 
-    SELECT employee_id, salary FROM employees WHERE department_id = 60 FOR UPDATE;
+    CURSOR c_sal IS
+        SELECT EMP_ID, SALARY
+        FROM EMP
+        FOR UPDATE;   -- locks rows for update
 
 BEGIN
-  FOR emp IN c_sal LOOP
-    UPDATE employees
-    SET salary = salary + 500
-    WHERE CURRENT OF c_sal;
+    FOR emp_rec IN c_sal LOOP
+        UPDATE EMP
+        SET SALARY = emp_rec.SALARY + 500   -- increment
+        WHERE CURRENT OF c_sal;              -- update exact row
 
-    DBMS_OUTPUT.PUT_LINE('Updated Salary for EMP ID: '||emp.employee_id);
-  END LOOP;
+        DBMS_OUTPUT.PUT_LINE(
+            'Updated Employee ID ' || emp_rec.EMP_ID
+        );
+    END LOOP;
 END;
 /
 
-Output
-Updated Salary for EMP ID: 103
-Updated Salary for EMP ID: 104
-Updated Salary for EMP ID: 105
+-- Check updated values
+SELECT * FROM EMP;
+
+-- ============================================
+-- END OF CURSOR EXPERIMENT
+-- ============================================
