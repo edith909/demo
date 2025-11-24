@@ -1,25 +1,25 @@
--- ================================
+-- ========================================
 -- DATABASE CREATION
--- ================================
-CREATE DATABASE IF NOT EXISTS collegeDB CHARACTER SET utf8mb4;
+-- ========================================
+CREATE DATABASE collegeDB;
 USE collegeDB;
 
--- ================================
+-- ========================================
 -- TABLE CREATION
--- ================================
-CREATE TABLE IF NOT EXISTS Department (
+-- ========================================
+CREATE TABLE Department (
     dept_id INT PRIMARY KEY AUTO_INCREMENT,
     dept_name VARCHAR(100) NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS Students (
+CREATE TABLE Students (
     id INT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     age INT,
     city VARCHAR(50)
 );
 
-CREATE TABLE IF NOT EXISTS Employees (
+CREATE TABLE Employees (
     emp_id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE,
@@ -28,100 +28,84 @@ CREATE TABLE IF NOT EXISTS Employees (
     FOREIGN KEY (dept_id) REFERENCES Department(dept_id)
 );
 
--- ================================
--- DESCRIBE TABLE (STRUCTURE CHECK)
--- ================================
+-- ========================================
+-- DESCRIBE TABLES
+-- ========================================
 DESCRIBE Students;
 DESCRIBE Employees;
 
--- ================================
+-- ========================================
 -- ALTER TABLE COMMANDS
--- ================================
-
--- Add Column
+-- ========================================
 ALTER TABLE Students
 ADD address VARCHAR(200);
 
--- Add Multiple Columns
 ALTER TABLE Students
 ADD mobile VARCHAR(15),
 ADD dob DATE;
 
--- Modify Column Type
 ALTER TABLE Students
 MODIFY age SMALLINT;
 
--- Change Column Name + Type
 ALTER TABLE Students
 CHANGE age student_age INT;
 
--- Drop Column
 ALTER TABLE Students
 DROP COLUMN dob;
 
--- ================================
+-- ========================================
 -- ADD CONSTRAINTS
--- ================================
-
--- Add PRIMARY KEY (if not exists)
+-- ========================================
 ALTER TABLE Students
 ADD PRIMARY KEY (id);
 
--- Add UNIQUE
 ALTER TABLE Employees
 ADD CONSTRAINT unique_email UNIQUE (email);
 
--- Add FOREIGN KEY
 ALTER TABLE Employees
 ADD CONSTRAINT fk_dept
 FOREIGN KEY (dept_id) REFERENCES Department(dept_id);
 
--- Add CHECK constraint
 ALTER TABLE Employees
 ADD CONSTRAINT chk_salary CHECK (salary > 1000);
 
--- ================================
+-- ========================================
 -- DROP CONSTRAINTS
--- ================================
-
--- Drop Primary Key
+-- ========================================
 ALTER TABLE Students
 DROP PRIMARY KEY;
 
--- Drop UNIQUE
 ALTER TABLE Employees
 DROP INDEX unique_email;
 
--- Drop FOREIGN KEY
 ALTER TABLE Employees
 DROP FOREIGN KEY fk_dept;
 
--- Drop CHECK Constraint
 ALTER TABLE Employees
 DROP CHECK chk_salary;
 
--- ================================
+-- ========================================
 -- INDEX CREATION / DELETION
--- ================================
+-- ========================================
 CREATE INDEX idx_student_name ON Students(name);
 DROP INDEX idx_student_name ON Students;
 
--- ================================
+-- ========================================
 -- RENAME TABLE
--- ================================
+-- ========================================
 RENAME TABLE Students TO StudentInfo;
 
--- ================================
+-- ========================================
 -- TRUNCATE TABLE
--- ================================
+-- ========================================
 TRUNCATE TABLE StudentInfo;
 
--- ================================
+-- ========================================
 -- DROP TABLE
--- ================================
-DROP TABLE IF EXISTS StudentInfo;
+-- ========================================
+DROP TABLE StudentInfo;
 
--- ================================
+-- ========================================
 -- DROP DATABASE
--- ================================
-DROP DATABASE IF EXISTS collegeDB;
+-- ========================================
+DROP DATABASE collegeDB;
