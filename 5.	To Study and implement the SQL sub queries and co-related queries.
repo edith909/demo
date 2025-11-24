@@ -1,120 +1,178 @@
-✅ What is a Subquery?
+-- ============================================
+-- EXPERIMENT 5:
+-- SQL Subqueries and Correlated Queries
+-- ============================================
 
-A Subquery (or nested query) is a query inside another query.
+-- CREATE DATABASE AND USE IT
+CREATE DATABASE subqueryDB;
+USE subqueryDB;
 
-Used for:
+-- ============================================
+-- CREATE SAMPLE TABLES
+-- ============================================
 
-Filtering data
-
-Comparison
-
-Fetching data for calculations
-
-Used with IN, EXISTS, ANY, ALL
-
-Syntax:
-SELECT column
-FROM table
-WHERE column OPERATOR (SELECT column FROM table);
-
-✅ Sample Tables
-Employees Table
-EmpID	Name	Dept	Salary
-1	Raj	IT	50000
-2	Sneha	HR	40000
-3	Aman	IT	60000
-4	Priya	Sales	45000
-5	Rahul	IT	55000
-Departments Table
-Dept	Location
-IT	Pune
-HR	Mumbai
-Sales	Delhi
-✅ Create Tables and Insert Data
-CREATE TABLE Employees (
-    EmpID INT PRIMARY KEY,
-    Name VARCHAR(50),
-    Dept VARCHAR(10),
-    Salary INT
+CREATE TABLE Department (
+    dept_id INT PRIMARY KEY,
+    dept_name VARCHAR(100)
 );
 
-INSERT INTO Employees VALUES
-(1, 'Raj', 'IT', 50000),
-(2, 'Sneha', 'HR', 40000),
-(3, 'Aman', 'IT', 60000),
-(4, 'Priya', 'Sales', 45000),
-(5, 'Rahul', 'IT', 55000);
-
-CREATE TABLE Departments (
-    Dept VARCHAR(10),
-    Location VARCHAR(50)
+CREATE TABLE Employee (
+    emp_id INT PRIMARY KEY,
+    emp_name VARCHAR(100),
+    dept_id INT,
+    salary DECIMAL(10,2),
+    city VARCHAR(50),
+    FOREIGN KEY (dept_id) REFERENCES Department(dept_id)
 );
 
-INSERT INTO Departments VALUES
-('IT', 'Pune'),
-('HR', 'Mumbai'),
-('Sales', 'Delhi');
+-- INSERT SAMPLE DATA
+INSERT INTO Department (dept_id, dept_name) VALUES
+(10, 'Computer'),
+(20, 'IT'),
+(30, 'HR'),
+(40, 'Accounts');
 
-✅ Simple Subquery Examples
-1️⃣ Employees earning more than average salary
-SELECT Name, Salary
-FROM Employees
-WHERE Salary > (SELECT AVG(Salary) FROM Employees);
+INSERT INTO Employee (emp_id, emp_name, dept_id, salary, city) VALUES
+(1, 'Rohan', 10, 45000, 'Pune'),
+(2, 'Sneha', 10, 55000, 'Mumbai'),
+(3, 'Amit',  20, 40000, 'Pune'),
+(4, 'Priya', 20, 60000, 'Delhi'),
+(5, 'Kiran', 30, 38000, 'Nashik'),
+(6, 'Meena', 30, 42000, 'Pune'),
+(7, 'Rahul', 40, 50000, 'Mumbai');
 
-2️⃣ Employees who work in departments located in Pune
-SELECT Name, Dept
-FROM Employees
-WHERE Dept IN (SELECT Dept FROM Departments WHERE Location = 'Pune');
+-- ============================================
+-- PART 1: SIMPLE SUBQUERIES (NON-CORRELATED)
+-- ============================================
 
-3️⃣ Highest Salary Employee
-SELECT Name, Salary
-FROM Employees
-WHERE Salary = (SELECT MAX(Salary) FROM Employees);
-
-4️⃣ Second Highest Salary
-SELECT Name, Salary
-FROM Employees
-WHERE Salary = (
-    SELECT MAX(Salary) 
-    FROM Employees 
-    WHERE Salary < (SELECT MAX(Salary) FROM Employees)
+-- 1. Single-row subquery ( = )
+-- Employees who earn more than the average salary of ALL employees
+SELECT emp_id, emp_name, salary
+FROM Employee
+WHERE salary > (
+    SELECT AVG(salary) FROM Employee
 );
 
-✅ Correlated Subquery
-
-A correlated subquery depends on the outer query.
-Runs row-by-row and uses values from outer table.
-
-Syntax
-SELECT column
-FROM table1 t1
-WHERE EXISTS (SELECT *
-              FROM table2 t2
-              WHERE condition using t1);
-
-Example 1️⃣: Employees earning more than average salary of their department
-SELECT e1.Name, e1.Dept, e1.Salary
-FROM Employees e1
-WHERE e1.Salary > (
-    SELECT AVG(e2.Salary)
-    FROM Employees e2
-    WHERE e1.Dept = e2.Dept
+-- 2. Single-row subquery with MAX()
+-- Employee(s) having the maximum salary
+SELECT emp_id, emp_name, salary
+FROM Employee
+WHERE salary = (
+    SELECT MAX(salary) FROM Employee
 );
 
-Example 2️⃣: List employees whose salary is highest in their department
-SELECT e1.Name, e1.Dept, e1.Salary
-FROM Employees e1
-WHERE e1.Salary = (
-    SELECT MAX(e2.Salary)
-    FROM Employees e2
-    WHERE e1.Dept = e2.Dept
+-- 3. Multi-row subquery using IN
+-- Employees working in departments located in a given set
+-- Here: employees whose dept_id is in departments having "IT" or "Computer"
+SELECT emp_id, emp_name, dept_id, salary
+FROM Employee
+WHERE dept_id IN (
+    SELECT dept_id
+    FROM Department
+    WHERE dept_name IN ('IT', 'Computer')
 );
 
-Example 3️⃣: Using EXISTS
-SELECT Name, Dept
-FROM Employees e
+-- 4. Subquery using ANY
+-- Employees whose salary is greater than ANY salary of employees in HR department
+SELECT emp_id, emp_name, salary
+FROM Employee
+WHERE salary > ANY (
+    SELECT salary FROM Employee WHERE dept_id = 30
+);
+
+-- 5. Subquery using ALL
+-- Employees whose salary is greater than ALL salaries in HR department
+SELECT emp_id, emp_name, salary
+FROM Employee
+WHERE salary > ALL (
+    SELECT salary FROM Employee WHERE dept_id = 30
+);
+
+-- 6. Subquery in FROM clause (inline view)
+-- Find average salary per department using subquery as a derived table
+SELECT d.dept_name, t.avg_salary
+FROM (
+    SELECT dept_id, AVG(salary) AS avg_salary
+    FROM Employee
+    GROUP BY dept_id
+) AS t
+INNER JOIN Department d ON d.dept_id = t.dept_id;
+
+-- 7. Subquery in SELECT clause (scalar subquery)
+-- Show employee with their department name using subquery
+SELECT 
+    e.emp_id,
+    e.emp_name,
+    e.salary,
+    (SELECT dept_name FROM Department d WHERE d.dept_id = e.dept_id) AS department_name
+FROM Employee e;
+
+-- ============================================
+-- PART 2: CORRELATED SUBQUERIES
+-- (Subquery depends on outer query row)
+-- ============================================
+
+-- 8. Correlated subquery: employee whose salary >
+--    average salary of their own department
+SELECT e.emp_id, e.emp_name, e.dept_id, e.salary
+FROM Employee e
+WHERE e.salary > (
+    SELECT AVG(e2.salary)
+    FROM Employee e2
+    WHERE e2.dept_id = e.dept_id
+);
+
+-- 9. Correlated subquery with EXISTS
+-- Departments that have at least one employee
+SELECT d.dept_id, d.dept_name
+FROM Department d
 WHERE EXISTS (
     SELECT 1
-    FROM Departments d
-    WHERE e.Dept = d.Dept
+    FROM Employee e
+    WHERE e.dept_id = d.dept_id
 );
+
+-- 10. Correlated subquery with NOT EXISTS
+-- Departments that have NO employees
+SELECT d.dept_id, d.dept_name
+FROM Department d
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM Employee e
+    WHERE e.dept_id = d.dept_id
+);
+
+-- 11. Correlated subquery: find highest paid employee
+-- in each department
+SELECT e.emp_id, e.emp_name, e.dept_id, e.salary
+FROM Employee e
+WHERE e.salary = (
+    SELECT MAX(e2.salary)
+    FROM Employee e2
+    WHERE e2.dept_id = e.dept_id
+);
+
+-- 12. Correlated subquery with city condition
+-- Employees whose salary is greater than
+-- average salary of employees in SAME CITY
+SELECT e.emp_id, e.emp_name, e.city, e.salary
+FROM Employee e
+WHERE e.salary > (
+    SELECT AVG(e2.salary)
+    FROM Employee e2
+    WHERE e2.city = e.city
+);
+
+-- 13. Correlated subquery used like filtering
+-- Employees who are NOT highest paid in their department
+SELECT e.emp_id, e.emp_name, e.dept_id, e.salary
+FROM Employee e
+WHERE e.salary < (
+    SELECT MAX(e2.salary)
+    FROM Employee e2
+    WHERE e2.dept_id = e.dept_id
+);
+
+-- ============================================
+-- END OF SCRIPT
+-- ============================================
