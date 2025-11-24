@@ -1,0 +1,165 @@
+-- =======================================
+-- USE DATABASE
+-- =======================================
+CREATE DATABASE shopDB;
+USE shopDB;
+
+-- =======================================
+-- CREATE SAMPLE TABLES FOR DML OPERATIONS
+-- =======================================
+CREATE TABLE Products (
+    product_id INT PRIMARY KEY AUTO_INCREMENT,
+    product_name VARCHAR(100) NOT NULL,
+    price DECIMAL(10,2),
+    category VARCHAR(50)
+);
+
+CREATE TABLE Customers (
+    customer_id INT PRIMARY KEY AUTO_INCREMENT,
+    customer_name VARCHAR(100),
+    city VARCHAR(50)
+);
+
+CREATE TABLE Orders (
+    order_id INT PRIMARY KEY AUTO_INCREMENT,
+    customer_id INT,
+    product_id INT,
+    quantity INT,
+    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id),
+    FOREIGN KEY (product_id) REFERENCES Products(product_id)
+);
+
+-- =======================================
+-- INSERT COMMANDS
+-- =======================================
+
+-- Insert single row
+INSERT INTO Products (product_name, price, category)
+VALUES ('Laptop', 55000, 'Electronics');
+
+-- Insert multiple rows
+INSERT INTO Products (product_name, price, category)
+VALUES 
+('Mobile', 20000, 'Electronics'),
+('Shoes', 1500, 'Fashion'),
+('Watch', 2500, 'Accessories');
+
+INSERT INTO Customers (customer_name, city)
+VALUES
+('Rohit Sharma', 'Mumbai'),
+('Virat Kohli', 'Delhi'),
+('MS Dhoni', 'Ranchi');
+
+INSERT INTO Orders (customer_id, product_id, quantity)
+VALUES
+(1, 1, 1),
+(2, 2, 2),
+(3, 3, 1);
+
+-- =======================================
+-- SELECT COMMANDS
+-- =======================================
+
+-- Select all rows
+SELECT * FROM Products;
+
+-- Specific columns
+SELECT product_name, price FROM Products;
+
+-- WHERE
+SELECT * FROM Products WHERE price > 5000;
+
+-- LIKE
+SELECT * FROM Customers WHERE customer_name LIKE 'R%';
+
+-- IN
+SELECT * FROM Products WHERE category IN ('Electronics', 'Fashion');
+
+-- BETWEEN
+SELECT * FROM Products WHERE price BETWEEN 1000 AND 30000;
+
+-- ORDER BY
+SELECT * FROM Products ORDER BY price ASC;
+
+-- LIMIT
+SELECT * FROM Products LIMIT 3;
+
+-- =======================================
+-- AGGREGATE FUNCTIONS
+-- =======================================
+
+SELECT COUNT(*) AS total_products FROM Products;
+SELECT MAX(price) AS highest_price FROM Products;
+SELECT MIN(price) AS lowest_price FROM Products;
+SELECT AVG(price) AS avg_price FROM Products;
+SELECT SUM(price) AS total_price FROM Products;
+
+-- =======================================
+-- GROUP BY / HAVING
+-- =======================================
+
+SELECT category, COUNT(*) AS total_items
+FROM Products
+GROUP BY category;
+
+SELECT category, AVG(price) AS avg_price
+FROM Products
+GROUP_BY category
+HAVING avg_price > 2000;
+
+-- =======================================
+-- UPDATE COMMANDS
+-- =======================================
+
+-- Update single column
+UPDATE Products
+SET price = 60000
+WHERE product_name = 'Laptop';
+
+-- Update multiple columns
+UPDATE Customers
+SET customer_name = 'Virat K', city = 'Bangalore'
+WHERE customer_id = 2;
+
+-- Update all rows
+UPDATE Products
+SET price = price + 100;
+
+-- =======================================
+-- DELETE COMMANDS
+-- =======================================
+
+-- Delete single row
+DELETE FROM Products
+WHERE product_name = 'Shoes';
+
+-- Delete using condition
+DELETE FROM Customers
+WHERE city = 'Ranchi';
+
+-- Delete all rows (DML)
+DELETE FROM Orders;
+
+-- =======================================
+-- SELECT WITH JOINS
+-- =======================================
+
+-- INNER JOIN
+SELECT c.customer_name, p.product_name, o.quantity
+FROM Orders o
+INNER JOIN Customers c ON o.customer_id = c.customer_id
+INNER JOIN Products p ON o.product_id = p.product_id;
+
+-- LEFT JOIN
+SELECT c.customer_name, o.order_id
+FROM Customers c
+LEFT JOIN Orders o ON c.customer_id = o.customer_id;
+
+-- RIGHT JOIN
+SELECT p.product_name, o.order_id
+FROM Products p
+RIGHT JOIN Orders o ON p.product_id = o.product_id;
+
+-- =======================================
+-- END OF DML SCRIPT
+-- =======================================
